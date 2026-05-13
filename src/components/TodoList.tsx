@@ -1,3 +1,4 @@
+import { useState, type DragEvent } from "react"
 import type { Todo, Filter } from "../lib/types"
 import TodoItem from "./TodoItem"
 
@@ -7,8 +8,11 @@ interface Props {
   loading: boolean
   error: string | null
   onToggle: (id: number, completed: boolean) => void
-  onUpdate: (id: number, title: string) => void
+  onUpdateName: (id: number, name: string) => void
+  onUpdateDescription: (id: number, description: string) => void
+  onUpdateDueDate: (id: number, due_date: string | null) => void
   onDelete: (id: number) => void
+  onReorder: (orderedIds: number[]) => void
 }
 
 const emptyMessages: Record<Filter, { title: string; subtitle: string }> = {
@@ -17,7 +21,47 @@ const emptyMessages: Record<Filter, { title: string; subtitle: string }> = {
   completed: { title: "No completed todos", subtitle: "Complete a todo to see it here" },
 }
 
-export default function TodoList({ todos, filter, loading, error, onToggle, onUpdate, onDelete }: Props) {
+export default function TodoList({
+  todos,
+  filter,
+  loading,
+  error,
+  onToggle,
+  onUpdateName,
+  onUpdateDescription,
+  onUpdateDueDate,
+  onDelete,
+  onReorder,
+}: Props) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  function handleDragStart(_e: DragEvent, index: number) {
+    setDragIndex(index)
+  }
+
+  function handleDragOver(e: DragEvent, index: number) {
+    e.preventDefault()
+    if (dragIndex === null) return
+    setDragOverIndex(index)
+  }
+
+  function handleDrop(_e: DragEvent, index: number) {
+    if (dragIndex === null || dragIndex === index) return
+    const ids = todos.map(t => t.id)
+    const [moved] = ids.splice(dragIndex, 1)
+    const newIndex = dragIndex < index ? index - 1 : index
+    ids.splice(newIndex, 0, moved)
+    onReorder(ids)
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
+  function handleDragEnd() {
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
   if (error) {
     return (
       <div className="p-8 text-center text-red-400 text-sm">
@@ -49,14 +93,22 @@ export default function TodoList({ todos, filter, loading, error, onToggle, onUp
   }
 
   return (
-    <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 130px)" }}>
-      {todos.map(todo => (
+    <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 150px)" }}>
+      {todos.map((todo, i) => (
         <TodoItem
           key={todo.id}
           todo={todo}
+          index={i}
           onToggle={onToggle}
-          onUpdate={onUpdate}
+          onUpdateName={onUpdateName}
+          onUpdateDescription={onUpdateDescription}
+          onUpdateDueDate={onUpdateDueDate}
           onDelete={onDelete}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
+          dragOverIndex={dragOverIndex}
         />
       ))}
     </div>

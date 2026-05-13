@@ -1,7 +1,10 @@
 export interface Todo {
   id: number
-  title: string
-  completed: number // SQLite stores booleans as 0/1
+  name: string
+  description: string
+  completed: number
+  due_date: string | null
+  sort_order: number
   created_at: string
   updated_at: string
 }
