@@ -1,4 +1,4 @@
-import { useState, useRef, type KeyboardEvent, type DragEvent } from "react"
+import { useState, useRef, type KeyboardEvent } from "react"
 import type { Todo } from "../lib/types"
 
 interface Props {
@@ -9,11 +9,23 @@ interface Props {
   onUpdateDescription: (id: number, description: string) => void
   onUpdateDueDate: (id: number, due_date: string | null) => void
   onDelete: (id: number) => void
-  onDragStart: (e: DragEvent, index: number) => void
-  onDragOver: (e: DragEvent, index: number) => void
-  onDrop: (e: DragEvent, index: number) => void
-  onDragEnd: () => void
-  dragOverIndex: number | null
+  onDragStart: (index: number) => void
+  isDragging: boolean
+  isDragOver: boolean
+  dragActive: boolean
+}
+
+function formatRecurrence(recurrence: string): string {
+  const [type, n] = recurrence.split(":")
+  const count = n ? parseInt(n) : 1
+  const labels: Record<string, string> = {
+    daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly",
+    days: `Every ${count} day${count > 1 ? "s" : ""}`,
+    weeks: `Every ${count} week${count > 1 ? "s" : ""}`,
+    months: `Every ${count} month${count > 1 ? "s" : ""}`,
+    years: `Every ${count} year${count > 1 ? "s" : ""}`,
+  }
+  return labels[type] ?? recurrence
 }
 
 function formatDueDate(dateStr: string): { text: string; urgent: boolean } {
@@ -39,10 +51,9 @@ export default function TodoItem({
   onUpdateDueDate,
   onDelete,
   onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  dragOverIndex,
+  isDragging,
+  isDragOver,
+  dragActive,
 }: Props) {
   const [editingName, setEditingName] = useState(false)
   const [editingDesc, setEditingDesc] = useState(false)
@@ -51,7 +62,6 @@ export default function TodoItem({
   const [showDate, setShowDate] = useState(!!todo.due_date)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descInputRef = useRef<HTMLTextAreaElement>(null)
-  const dragged = dragOverIndex != null && dragOverIndex === index
 
   function startEditName() {
     setEditingName(true)
@@ -95,26 +105,28 @@ export default function TodoItem({
 
   return (
     <div
+      data-todo-index={index}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      draggable
-      onDragStart={e => onDragStart(e, index)}
-      onDragOver={e => onDragOver(e, index)}
-      onDrop={e => onDrop(e, index)}
-      onDragEnd={onDragEnd}
-      className={`todo-enter group flex items-start gap-2 px-3 py-3 border-b border-gray-800
-                  hover:bg-gray-800/50 transition-colors cursor-default
-                  outline-none focus:bg-gray-800/70 focus:ring-1 focus:ring-blue-500/50
+      className={`todo-enter group flex items-start gap-2 px-3 py-3 border-b border-white/5
+                  hover:bg-white/5 transition-colors
+                  outline-none focus:bg-white/10 focus:ring-1 focus:ring-blue-500/50
                   ${todo.completed ? "opacity-50" : ""}
-                  ${dragged ? "bg-gray-800/40" : ""}`}
+                  ${isDragging ? "opacity-30 bg-white/10" : ""}
+                  ${isDragOver ? "border-t-2 border-t-blue-400" : ""}
+                  ${dragActive ? "cursor-default" : "cursor-default"}`}
     >
       {/* Drag handle */}
       <span
+        onMouseDown={(e) => {
+          e.preventDefault()
+          onDragStart(index)
+        }}
         className="mt-0.5 text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing
                    opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 select-none"
         title="Drag to reorder"
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 6h2v2H8V6zm6 0h2v2h-2V6zM8 11h2v2H8v-2zm6 0h2v2h-2v-2zm-6 5h2v2H8v-2zm6 0h2v2h-2v-2z" />
         </svg>
       </span>
@@ -122,16 +134,17 @@ export default function TodoItem({
       {/* Checkbox */}
       <button
         onClick={() => onToggle(todo.id, !todo.completed)}
+        onMouseDown={(e) => e.stopPropagation()}
         className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5
                     flex items-center justify-center transition-colors
                     ${
                       todo.completed
                         ? "border-green-500 bg-green-500"
-                        : "border-gray-600 hover:border-green-400"
+                        : "border-white/10 hover:border-green-400"
                     }`}
       >
         {todo.completed && (
-          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-3 h-3 text-white pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         )}
@@ -150,7 +163,7 @@ export default function TodoItem({
               if (e.key === "Escape") { setEditName(todo.name); setEditingName(false) }
             }}
             onBlur={commitName}
-            className="w-full bg-gray-700 text-gray-100 px-2 py-1 rounded text-sm
+            className="w-full bg-white/15 text-white px-2 py-1 rounded text-sm
                        outline-none border border-blue-500"
           />
         ) : (
@@ -173,7 +186,7 @@ export default function TodoItem({
             }}
             onBlur={commitDesc}
             rows={2}
-            className="w-full bg-gray-700 text-gray-200 px-2 py-1 rounded text-xs mt-1
+            className="w-full bg-white/15 text-white px-2 py-1 rounded text-xs mt-1
                        outline-none border border-blue-500 resize-none"
           />
         ) : (
@@ -187,25 +200,36 @@ export default function TodoItem({
           )
         )}
 
-        {/* Due date & add date button */}
-        <div className="flex items-center gap-2 mt-1">
+        {/* Due date, recurrence & add date button */}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
           {todo.due_date && showDate && dueInfo && (
             <span
               onClick={() => {
                 const newDate = prompt("Change due date (YYYY-MM-DD):", todo.due_date ?? "")
-                if (newDate !== null) {
-                  onUpdateDueDate(todo.id, newDate || null)
+                if (newDate !== null && newDate.trim()) {
+                  onUpdateDueDate(todo.id, newDate.trim())
                 }
               }}
               className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer
-                ${dueInfo.urgent ? "bg-red-500/20 text-red-400" : "bg-gray-700 text-gray-400"}`}
+                ${dueInfo.urgent ? "bg-red-500/20 text-red-400" : "bg-white/10 text-gray-400"}`}
             >
               {dueInfo.text}
             </span>
           )}
+          {todo.recurrence && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+              {formatRecurrence(todo.recurrence)}
+            </span>
+          )}
           {(!todo.due_date || !showDate) && (
             <button
-              onClick={() => { setShowDate(true); onUpdateDueDate(todo.id, ""); }}
+              onClick={() => {
+                const newDate = prompt("Set due date (YYYY-MM-DD):", "")
+                if (newDate !== null && newDate.trim()) {
+                  onUpdateDueDate(todo.id, newDate.trim())
+                  setShowDate(true)
+                }
+              }}
               className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
             >
               + Due date
@@ -217,11 +241,12 @@ export default function TodoItem({
       {/* Delete */}
       <button
         onClick={() => onDelete(todo.id)}
+        onMouseDown={(e) => e.stopPropagation()}
         className="opacity-0 group-hover:opacity-100 text-gray-500
                    hover:text-red-400 transition-all flex-shrink-0 mt-0.5"
         title="Delete"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>

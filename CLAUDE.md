@@ -59,17 +59,23 @@ todolist-app/
 - **Tailwind classes**: Use utility classes directly in JSX. No `@apply` in CSS unless absolutely necessary.
 - **File naming**: `kebab-case` for files, `PascalCase` for component file names matching the component.
 
-## Database Schema (planned)
+## Database Schema
 
 ```sql
 CREATE TABLE todos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
   completed INTEGER NOT NULL DEFAULT 0,
+  due_date TEXT,
+  sort_order REAL NOT NULL DEFAULT 0,
+  recurrence TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
+
+Migrations are handled incrementally in `src/lib/db.ts` — old columns (`title` → `name`) are renamed, missing columns are added via `ALTER TABLE ADD COLUMN`.
 
 ## Development Commands
 

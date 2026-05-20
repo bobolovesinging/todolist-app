@@ -5,6 +5,7 @@ export interface Todo {
   completed: number
   due_date: string | null
   sort_order: number
+  recurrence: string | null
   created_at: string
   updated_at: string
 }

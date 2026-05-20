@@ -24,11 +24,11 @@ export function useTodos() {
   }, [fetchTodos])
 
   const addTodo = useCallback(
-    async (name: string, description: string = "", due_date: string | null = null) => {
+    async (name: string, description: string = "", due_date: string | null = null, recurrence: string | null = null) => {
       const trimmed = name.trim()
       if (!trimmed) return
       try {
-        const todo = await db.addTodo(trimmed, description, due_date)
+        const todo = await db.addTodo(trimmed, description, due_date, recurrence)
         setTodos(prev => [todo, ...prev])
       } catch (e) {
         setError(String(e))
@@ -39,14 +39,24 @@ export function useTodos() {
 
   const toggleTodo = useCallback(async (id: number, completed: boolean) => {
     try {
-      await db.toggleTodo(id, completed)
-      setTodos(prev =>
-        prev.map(t => (t.id === id ? { ...t, completed: completed ? 1 : 0 } : t))
-      )
+      const todo = todos.find(t => t.id === id)
+      if (completed && todo?.recurrence && todo.due_date) {
+        const nextDate = await db.completeRecurringTodo(id, todo.due_date, todo.recurrence)
+        setTodos(prev =>
+          prev.map(t =>
+            t.id === id ? { ...t, due_date: nextDate, updated_at: new Date().toISOString() } : t
+          )
+        )
+      } else {
+        await db.toggleTodo(id, completed)
+        setTodos(prev =>
+          prev.map(t => (t.id === id ? { ...t, completed: completed ? 1 : 0 } : t))
+        )
+      }
     } catch (e) {
       setError(String(e))
     }
-  }, [])
+  }, [todos])
 
   const updateName = useCallback(async (id: number, name: string) => {
     const trimmed = name.trim()

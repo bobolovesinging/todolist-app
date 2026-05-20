@@ -22,7 +22,7 @@ export default function FilterBar({
   onClearCompleted,
 }: Props) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-700 text-xs">
+    <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 text-xs">
       <span className="text-gray-500 w-20">
         {activeCount} item{activeCount !== 1 ? "s" : ""} left
       </span>

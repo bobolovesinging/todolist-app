@@ -1,7 +1,18 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react"
 
+function computeCountdownDate(n: number, unit: string): string {
+  const d = new Date()
+  switch (unit) {
+    case "days":   d.setDate(d.getDate() + n); break
+    case "weeks":  d.setDate(d.getDate() + 7 * n); break
+    case "months": d.setMonth(d.getMonth() + n); break
+    case "years":  d.setFullYear(d.getFullYear() + n); break
+  }
+  return d.toISOString().split("T")[0]
+}
+
 interface Props {
-  onAdd: (name: string, description: string, dueDate: string | null) => void
+  onAdd: (name: string, description: string, dueDate: string | null, recurrence: string | null) => void
   focusTrigger: number
 }
 
@@ -9,6 +20,12 @@ export default function AddTodo({ onAdd, focusTrigger }: Props) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [dueDate, setDueDate] = useState("")
+  const [dateMode, setDateMode] = useState<"date" | "countdown">("date")
+  const [countdownValue, setCountdownValue] = useState(1)
+  const [countdownUnit, setCountdownUnit] = useState("days")
+  const [recurrence, setRecurrence] = useState("")
+  const [customInterval, setCustomInterval] = useState(1)
+  const [customUnit, setCustomUnit] = useState("days")
   const [expanded, setExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -21,10 +38,22 @@ export default function AddTodo({ onAdd, focusTrigger }: Props) {
 
   function handleSubmit() {
     if (name.trim()) {
-      onAdd(name, description, dueDate || null)
+      const finalDueDate = dateMode === "countdown"
+        ? computeCountdownDate(countdownValue, countdownUnit)
+        : dueDate || null
+      const recurrenceValue = recurrence === "custom"
+        ? `${customUnit}:${customInterval}`
+        : recurrence || null
+      onAdd(name, description, finalDueDate, recurrenceValue)
       setName("")
       setDescription("")
       setDueDate("")
+      setDateMode("date")
+      setCountdownValue(1)
+      setCountdownUnit("days")
+      setRecurrence("")
+      setCustomInterval(1)
+      setCustomUnit("days")
       setExpanded(false)
     }
     inputRef.current?.focus()
@@ -39,12 +68,18 @@ export default function AddTodo({ onAdd, focusTrigger }: Props) {
       setName("")
       setDescription("")
       setDueDate("")
+      setDateMode("date")
+      setCountdownValue(1)
+      setCountdownUnit("days")
+      setRecurrence("")
+      setCustomInterval(1)
+      setCustomUnit("days")
       setExpanded(false)
     }
   }
 
   return (
-    <div className="px-4 py-3 border-b border-gray-700">
+    <div className="px-4 py-3 border-b border-white/10">
       <div className="flex gap-2">
         <input
           ref={inputRef}
@@ -53,9 +88,9 @@ export default function AddTodo({ onAdd, focusTrigger }: Props) {
           onChange={e => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="What needs to be done?"
-          className="flex-1 bg-gray-800 text-gray-100 placeholder-gray-500
+          className="flex-1 bg-[#1d1d24] text-gray-100 placeholder-gray-500
                      px-3 py-2 rounded-lg outline-none text-sm
-                     border border-gray-700 focus:border-blue-500
+                     border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
                      transition-colors"
           autoFocus
         />
@@ -63,8 +98,8 @@ export default function AddTodo({ onAdd, focusTrigger }: Props) {
           onClick={() => setExpanded(!expanded)}
           className={`px-2 py-2 rounded-lg border transition-colors text-sm
             ${expanded
-              ? "bg-gray-700 border-gray-600 text-gray-200"
-              : "border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600"
+              ? "bg-white/10 border-white/15 text-white"
+              : "border-white/10 text-gray-500 hover:text-gray-300 hover:border-white/15"
             }`}
           title="More options"
         >
@@ -93,26 +128,128 @@ export default function AddTodo({ onAdd, focusTrigger }: Props) {
             onKeyDown={e => {
               if (e.key === "Escape") {
                 setDescription("")
+                setDateMode("date")
+                setCountdownValue(1)
+                setCountdownUnit("days")
+                setRecurrence("")
+                setCustomInterval(1)
+                setCustomUnit("days")
                 setExpanded(false)
                 inputRef.current?.focus()
               }
             }}
             placeholder="Description (optional)"
             rows={2}
-            className="w-full bg-gray-800 text-gray-200 placeholder-gray-500
+            className="w-full bg-[#1d1d24] text-gray-100 placeholder-gray-500
                        px-3 py-2 rounded-lg outline-none text-sm resize-none
-                       border border-gray-700 focus:border-blue-500
+                       border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
                        transition-colors"
           />
-          <input
-            type="date"
-            value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
-            className="w-full bg-gray-800 text-gray-200 px-3 py-2
+          <select
+            value={recurrence}
+            onChange={e => setRecurrence(e.target.value)}
+            className="w-full bg-[#1d1d24] text-gray-100 px-3 py-2
                        rounded-lg outline-none text-sm
-                       border border-gray-700 focus:border-blue-500
-                       transition-colors [color-scheme:dark]"
-          />
+                       border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
+                       transition-colors"
+          >
+            <option value="">No repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="custom">Custom...</option>
+          </select>
+
+          {recurrence === "custom" && (
+            <div className="flex gap-2">
+              <span className="text-sm text-gray-400 self-center">Every</span>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={customInterval}
+                onChange={e => setCustomInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-16 bg-[#1d1d24] text-gray-100 px-2 py-2
+                           rounded-lg outline-none text-sm text-center
+                           border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
+                           transition-colors"
+              />
+              <select
+                value={customUnit}
+                onChange={e => setCustomUnit(e.target.value)}
+                className="flex-1 bg-[#1d1d24] text-gray-100 px-3 py-2
+                           rounded-lg outline-none text-sm
+                           border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
+                           transition-colors"
+              >
+                <option value="days">Days</option>
+                <option value="weeks">Weeks</option>
+                <option value="months">Months</option>
+                <option value="years">Years</option>
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-1">
+            <button
+              onClick={() => setDateMode("date")}
+              className={`flex-1 py-1.5 rounded-lg text-xs transition-colors
+                ${dateMode === "date"
+                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                  : "text-gray-500 hover:text-gray-400 border border-transparent"}`}
+            >
+              Date
+            </button>
+            <button
+              onClick={() => setDateMode("countdown")}
+              className={`flex-1 py-1.5 rounded-lg text-xs transition-colors
+                ${dateMode === "countdown"
+                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                  : "text-gray-500 hover:text-gray-400 border border-transparent"}`}
+            >
+              Countdown
+            </button>
+          </div>
+
+          {dateMode === "date" ? (
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="w-full bg-[#1d1d24] text-gray-100 px-3 py-2
+                         rounded-lg outline-none text-sm
+                         border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
+                         transition-colors"
+            />
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={countdownValue}
+                onChange={e => setCountdownValue(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-16 bg-[#1d1d24] text-gray-100 px-2 py-2
+                           rounded-lg outline-none text-sm text-center
+                           border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
+                           transition-colors"
+              />
+              <select
+                value={countdownUnit}
+                onChange={e => setCountdownUnit(e.target.value)}
+                className="flex-1 bg-[#1d1d24] text-gray-100 px-3 py-2
+                           rounded-lg outline-none text-sm
+                           border border-gray-700/60 hover:border-gray-600/60 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20
+                           transition-colors"
+              >
+                <option value="days">Days</option>
+                <option value="weeks">Weeks</option>
+                <option value="months">Months</option>
+                <option value="years">Years</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
     </div>

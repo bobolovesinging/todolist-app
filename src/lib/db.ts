@@ -20,6 +20,7 @@ async function migrate(db: Database) {
       completed INTEGER NOT NULL DEFAULT 0,
       due_date TEXT,
       sort_order REAL NOT NULL DEFAULT 0,
+      recurrence TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
@@ -40,6 +41,9 @@ async function migrate(db: Database) {
   if (!colNames.includes("sort_order")) {
     await db.execute("ALTER TABLE todos ADD COLUMN sort_order REAL NOT NULL DEFAULT 0")
   }
+  if (!colNames.includes("recurrence")) {
+    await db.execute("ALTER TABLE todos ADD COLUMN recurrence TEXT")
+  }
 }
 
 export async function getAllTodos(): Promise<Todo[]> {
@@ -52,7 +56,8 @@ export async function getAllTodos(): Promise<Todo[]> {
 export async function addTodo(
   name: string,
   description: string = "",
-  due_date: string | null = null
+  due_date: string | null = null,
+  recurrence: string | null = null
 ): Promise<Todo> {
   const db = await getDb()
   const maxOrder = await db.select<[{ m: number | null }]>(
@@ -60,8 +65,8 @@ export async function addTodo(
   )
   const sortOrder = (maxOrder[0]?.m ?? 0) + 1
   const result = await db.execute(
-    "INSERT INTO todos (name, description, due_date, sort_order) VALUES ($1, $2, $3, $4)",
-    [name, description, due_date, sortOrder]
+    "INSERT INTO todos (name, description, due_date, sort_order, recurrence) VALUES ($1, $2, $3, $4, $5)",
+    [name, description, due_date, sortOrder, recurrence]
   )
   const rows = await db.select<Todo[]>(
     "SELECT * FROM todos WHERE id = $1",
@@ -112,6 +117,46 @@ export async function clearCompleted(): Promise<void> {
   await db.execute("DELETE FROM todos WHERE completed = 1")
 }
 
+export function getNextDueDate(current: string, recurrence: string): string {
+  const d = new Date(current)
+  const [type, n] = recurrence.split(":")
+  const count = n ? parseInt(n) : 1
+
+  switch (type) {
+    case "daily":
+    case "days":
+      d.setDate(d.getDate() + count)
+      break
+    case "weekly":
+    case "weeks":
+      d.setDate(d.getDate() + 7 * count)
+      break
+    case "monthly":
+    case "months":
+      d.setMonth(d.getMonth() + count)
+      break
+    case "yearly":
+    case "years":
+      d.setFullYear(d.getFullYear() + count)
+      break
+  }
+  return d.toISOString().split("T")[0]
+}
+
+export async function completeRecurringTodo(
+  id: number,
+  due_date: string,
+  recurrence: string
+): Promise<string> {
+  const nextDate = getNextDueDate(due_date, recurrence)
+  const db = await getDb()
+  await db.execute(
+    "UPDATE todos SET due_date = $1, updated_at = datetime('now') WHERE id = $2",
+    [nextDate, id]
+  )
+  return nextDate
+}
+
 export async function reorderTodos(orderedIds: number[]): Promise<void> {
   const db = await getDb()
   for (let i = 0; i < orderedIds.length; i++) {
@@ -122,14 +167,3 @@ export async function reorderTodos(orderedIds: number[]): Promise<void> {
   }
 }
 
-export async function getCounts(): Promise<{ total: number; active: number; completed: number }> {
-  const db = await getDb()
-  const rows = await db.select<[{ total: number; active: number; completed: number }]>(
-    `SELECT
-      COUNT(*) as total,
-      SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END) as active,
-      SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed
-    FROM todos`
-  )
-  return rows[0]
-}

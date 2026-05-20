@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { Todo, Filter } from "../lib/types"
 import TodoItem from "./TodoItem"
 
@@ -35,32 +35,60 @@ export default function TodoList({
 }: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
-  function handleDragStart(_e: DragEvent, index: number) {
+  const handleDragStart = (index: number) => {
     setDragIndex(index)
   }
 
-  function handleDragOver(e: DragEvent, index: number) {
-    e.preventDefault()
+  useEffect(() => {
     if (dragIndex === null) return
-    setDragOverIndex(index)
-  }
 
-  function handleDrop(_e: DragEvent, index: number) {
-    if (dragIndex === null || dragIndex === index) return
-    const ids = todos.map(t => t.id)
-    const [moved] = ids.splice(dragIndex, 1)
-    const newIndex = dragIndex < index ? index - 1 : index
-    ids.splice(newIndex, 0, moved)
-    onReorder(ids)
-    setDragIndex(null)
-    setDragOverIndex(null)
-  }
+    const handleMouseMove = (e: MouseEvent) => {
+      e.preventDefault()
+      const container = listRef.current
+      if (!container) return
+      const items = container.querySelectorAll("[data-todo-index]")
+      const containerRect = container.getBoundingClientRect()
 
-  function handleDragEnd() {
-    setDragIndex(null)
-    setDragOverIndex(null)
-  }
+      let newOver = dragIndex
+      for (let i = 0; i < items.length; i++) {
+        const rect = items[i].getBoundingClientRect()
+        const midY = rect.top + rect.height / 2 - containerRect.top
+        // Track position relative to the list container, not viewport
+        const relY = e.clientY - containerRect.top
+        if (relY < midY) {
+          newOver = i
+          break
+        }
+        newOver = i + 1
+      }
+      setDragOverIndex(newOver)
+    }
+
+    const handleMouseUp = () => {
+      setDragIndex(prev => {
+        setDragOverIndex(ov => {
+          if (prev !== null && ov !== null && prev !== ov) {
+            const ids = todos.map(t => t.id)
+            const [moved] = ids.splice(prev, 1)
+            const dropIdx = prev < ov ? ov - 1 : ov
+            ids.splice(dropIdx, 0, moved)
+            onReorder(ids)
+          }
+          return null
+        })
+        return null
+      })
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+  }, [dragIndex, todos, onReorder])
 
   if (error) {
     return (
@@ -93,7 +121,7 @@ export default function TodoList({
   }
 
   return (
-    <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 150px)" }}>
+    <div ref={listRef} className="flex-1 overflow-y-auto min-h-0">
       {todos.map((todo, i) => (
         <TodoItem
           key={todo.id}
@@ -105,10 +133,9 @@ export default function TodoList({
           onUpdateDueDate={onUpdateDueDate}
           onDelete={onDelete}
           onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onDragEnd={handleDragEnd}
-          dragOverIndex={dragOverIndex}
+          isDragging={dragIndex === i}
+          isDragOver={dragOverIndex !== null && dragOverIndex === i && dragIndex !== i}
+          dragActive={dragIndex !== null}
         />
       ))}
     </div>
