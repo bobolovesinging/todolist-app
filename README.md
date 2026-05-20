@@ -2,6 +2,10 @@
 
 A lightweight desktop todo list application built with **Tauri v2** + **React** + **TypeScript** + **Tailwind CSS**. Data is persisted locally via **SQLite**, no cloud dependencies.
 
+## Download
+
+[Download Latest Release](https://github.com/bobolovesinging/todolist-app/releases/latest) — double-click to install, no dev environment required. Windows 10+ only.
+
 ## Features
 
 - Create, edit, delete, and reorder tasks
