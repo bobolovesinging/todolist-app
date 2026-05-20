@@ -95,18 +95,18 @@ export default function App() {
     <div
       className="h-screen flex flex-col bg-gray-950/70 backdrop-blur-2xl
                  border-l border-white/5 overflow-hidden relative"
-      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       ref={containerRef}
     >
-      {/* Handle tab - visible grab point when sidebar is hidden */}
+      {/* Handle tab - visible grab point at top-right corner when hidden */}
       <div
-        className="absolute left-0 top-1/2 -translate-y-1/2
-                   w-[10px] h-24 rounded-r-full
+        className="absolute left-0 top-4
+                   w-[10px] h-10 rounded-r-full
                    bg-gradient-to-r from-blue-400/50 to-blue-500/10
                    hover:from-blue-400/70 hover:to-blue-500/25
                    hover:w-3 transition-all duration-200
                    cursor-pointer z-50"
+        onMouseEnter={handleMouseEnter}
         title="Hover to reveal sidebar"
       />
 

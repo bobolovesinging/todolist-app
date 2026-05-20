@@ -88,11 +88,9 @@ pub fn run() {
                 let screen_h = size.height as f64 / scale;
                 let sidebar_w = 400.0;
                 let tab_visible = 12.0;
-                let _hidden_x = screen_w - tab_visible;
-                let shown_x = screen_w - sidebar_w;
                 window.set_size(LogicalSize::new(sidebar_w, screen_h)).ok();
-                // Start with sidebar fully visible so user can see todos
-                window.set_position(LogicalPosition::new(shown_x, 0.0)).ok();
+                // Start hidden — only the top-right tab is visible
+                window.set_position(LogicalPosition::new(screen_w - tab_visible, 0.0)).ok();
             }
 
             window.show().ok();

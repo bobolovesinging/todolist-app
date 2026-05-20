@@ -13,9 +13,10 @@ export function useSidebar(config: SidebarConfig) {
   const hiddenXRef = useRef(0)
   const shownXRef = useRef(0)
   const pinnedRef = useRef(false)
+  const readyRef = useRef(false)
 
   const showSidebar = useCallback(async () => {
-    if (pinnedRef.current) return
+    if (pinnedRef.current || !readyRef.current) return
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current)
       hideTimerRef.current = null
@@ -25,11 +26,10 @@ export function useSidebar(config: SidebarConfig) {
     )
   }, [])
 
-  const hideSidebar = useCallback((delay = 300) => {
-    if (pinnedRef.current) return
+  const hideSidebar = useCallback((delay = 200) => {
+    if (pinnedRef.current || !readyRef.current) return
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
     hideTimerRef.current = setTimeout(async () => {
-      // Don't hide if user is actively editing
       const active = document.activeElement
       if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return
       await getCurrentWindow().setPosition(
@@ -65,11 +65,10 @@ export function useSidebar(config: SidebarConfig) {
 
     const win = getCurrentWindow()
     await win.setSize(new LogicalSize(sidebarWidth, logicalH))
-    // Start visible by default, will auto-hide after first mouse leave
     if (pinnedRef.current) {
       await win.setPosition(new LogicalPosition(shownXRef.current, 0))
     }
-    // Don't set to hidden on initial load; let Rust show it first
+    readyRef.current = true
   }, [])
 
   useEffect(() => {
@@ -82,20 +81,11 @@ export function useSidebar(config: SidebarConfig) {
     return () => window.removeEventListener("resize", handleResize)
   }, [positionWindow])
 
-  // Hide sidebar when mouse leaves the entire window
-  useEffect(() => {
-    const handleDocMouseLeave = () => {
-      hideSidebar(0)
-    }
-    document.addEventListener("mouseleave", handleDocMouseLeave)
-    return () => document.removeEventListener("mouseleave", handleDocMouseLeave)
-  }, [hideSidebar])
-
   // Hide sidebar when window loses focus (unless pinned)
   useEffect(() => {
     let unlisten: (() => void) | undefined
     getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (!focused && !pinnedRef.current) {
+      if (!focused && !pinnedRef.current && readyRef.current) {
         hideSidebar(0)
       }
     }).then(fn => { unlisten = fn })
