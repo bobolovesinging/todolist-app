@@ -48,9 +48,29 @@ async function migrate(db: Database) {
 
 export async function getAllTodos(): Promise<Todo[]> {
   const db = await getDb()
-  return db.select<Todo[]>(
+  const todos = await db.select<Todo[]>(
     "SELECT * FROM todos ORDER BY sort_order ASC, created_at DESC"
   )
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  for (const todo of todos) {
+    if (todo.recurrence && todo.due_date && !todo.completed) {
+      const [y, m, d] = todo.due_date.split("-").map(Number)
+      const dueDate = new Date(y, m - 1, d)
+      if (dueDate < today) {
+        const nextDate = getNextDueDate(todo.due_date, todo.recurrence)
+        todo.due_date = nextDate
+        await db.execute(
+          "UPDATE todos SET due_date = $1, updated_at = datetime('now') WHERE id = $2",
+          [nextDate, todo.id]
+        )
+      }
+    }
+  }
+
+  return todos
 }
 
 export async function addTodo(
@@ -118,29 +138,43 @@ export async function clearCompleted(): Promise<void> {
 }
 
 export function getNextDueDate(current: string, recurrence: string): string {
-  const d = new Date(current)
+  const [y, m, d] = current.split("-").map(Number)
+  const date = new Date(y, m - 1, d)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   const [type, n] = recurrence.split(":")
   const count = n ? parseInt(n) : 1
 
-  switch (type) {
-    case "daily":
-    case "days":
-      d.setDate(d.getDate() + count)
-      break
-    case "weekly":
-    case "weeks":
-      d.setDate(d.getDate() + 7 * count)
-      break
-    case "monthly":
-    case "months":
-      d.setMonth(d.getMonth() + count)
-      break
-    case "yearly":
-    case "years":
-      d.setFullYear(d.getFullYear() + count)
-      break
+  const advance = () => {
+    switch (type) {
+      case "daily":
+      case "days":
+        date.setDate(date.getDate() + count)
+        break
+      case "weekly":
+      case "weeks":
+        date.setDate(date.getDate() + 7 * count)
+        break
+      case "monthly":
+      case "months":
+        date.setMonth(date.getMonth() + count)
+        break
+      case "yearly":
+      case "years":
+        date.setFullYear(date.getFullYear() + count)
+        break
+    }
   }
-  return d.toISOString().split("T")[0]
+
+  advance()
+  while (date < today) {
+    advance()
+  }
+  const yy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, "0")
+  const dd = String(date.getDate()).padStart(2, "0")
+  return `${yy}-${mm}-${dd}`
 }
 
 export async function completeRecurringTodo(

@@ -29,7 +29,8 @@ function formatRecurrence(recurrence: string): string {
 }
 
 function formatDueDate(dateStr: string): { text: string; urgent: boolean } {
-  const due = new Date(dateStr)
+  const [y, m, d] = dateStr.split("-").map(Number)
+  const due = new Date(y, m - 1, d)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const diff = due.getTime() - today.getTime()

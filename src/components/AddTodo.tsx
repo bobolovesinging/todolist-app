@@ -8,7 +8,10 @@ function computeCountdownDate(n: number, unit: string): string {
     case "months": d.setMonth(d.getMonth() + n); break
     case "years":  d.setFullYear(d.getFullYear() + n); break
   }
-  return d.toISOString().split("T")[0]
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, "0")
+  const da = String(d.getDate()).padStart(2, "0")
+  return `${y}-${mo}-${da}`
 }
 
 interface Props {
